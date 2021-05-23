@@ -1,7 +1,6 @@
 import React, { Component } from 'react';
 
 import Particles from 'react-particles-js';
-import Clarifai from 'clarifai';
 
 import Register from './components/Register/Register';
 import Signin from './components/Signin/Signin';
@@ -11,10 +10,6 @@ import ImageLinkForm from './components/ImageLinkForm/ImageLinkForm';
 import Rank from './components/Rank/Rank';
 import FaceRecognition from './components/FaceRecognition/FaceRecognition';
 import './App.css';
-
-const app = new Clarifai.App({
-  apiKey: '33ae7ac179b94a39b5d36b4a6778a499'
-});
 
 const particlesOptions = {
   particles: {
@@ -28,23 +23,26 @@ const particlesOptions = {
   }
 }
 
+const initialState = {
+  input: '',
+  imageUrl: '',
+  box: {},
+  route: 'signin',
+  isSigned: false,
+  user: {
+    id: '',
+    name: '',
+    email: '',
+    entries: 0,
+    joined: ''
+  }
+}
+
+
 class App extends Component {
   constructor() {
     super();
-    this.state = {
-      input: '',
-      imageUrl: '',
-      box: {},
-      route: 'signin',
-      isSigned: false,
-      user: {
-        id: '',
-        name: '',
-        email: '',
-        entries: 0,
-        joined: ''
-      }
-    }
+    this.state = initialState;
   }
 
   loadUser = (data) => {
@@ -85,15 +83,38 @@ class App extends Component {
   onSubmit = () => {
     this.setState({ imageUrl: this.state.input });
 
-    app.models
-      .predict("f76196b43bbd45c99b4f3cd8e8b40a8a", this.state.input)
-      .then(response => this.displayFaceBox(this.calculateFaceLocation(response)))
+    fetch('http://localhost:3000/imageUrl', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        input: this.state.input
+      })
+    })
+      .then(response => response.json())
+      .then(response => {
+        if (response) {
+          fetch('http://localhost:3000/image', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id: this.state.user.id
+            })
+          })
+          .then(response => response.json())
+          .then(count => {
+            this.setState(Object.assign(this.state.user, { entries: count }));
+          })
+          .catch(console.log)
+
+        }
+        this.displayFaceBox(this.calculateFaceLocation(response))
+      })
       .catch(err => console.log(err));
   }
 
   onRouteChange = (route) => {
     if (route === 'signout') {
-      this.setState({ isSigned: false })
+      this.setState(initialState)
     } else if (route === 'home') {
       this.setState({ isSigned: true })
     }
@@ -101,7 +122,7 @@ class App extends Component {
   }
 
   render() {
-    const { isSigned, imageUrl, route, box, user} = this.state;
+    const { isSigned, imageUrl, route, box, user } = this.state;
     return (
       <div className="App">
         <Particles className='particles'
@@ -111,7 +132,7 @@ class App extends Component {
         { route === 'home' ?
           <div>
             <Logo />
-            <Rank name={user.name} entries={user.entries}/>
+            <Rank name={user.name} entries={user.entries} />
             <ImageLinkForm onInputChange={this.onInputChange} onSubmit={this.onSubmit} />
             <FaceRecognition box={box} imageUrl={imageUrl} />
           </div>
